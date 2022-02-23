@@ -119,7 +119,7 @@ class ConfigLoader(object):
                 self.parse_vpn_section(config, section)
 
     def load_default_settings(self):
-        info('Using default settings => localhost:5555')
+        info('Using default settings => 10.8.0.1:5555')
         self.settings = {'site': 'Default Site',
                          'maps': 'True',
                          'ip2location_db': '/usr/share/IP2LOCATION-LITE-DB11.BIN',

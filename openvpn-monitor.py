@@ -21,7 +21,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import os, IP2Location, sys
+import os, IP2Location, sys, ipaddress
 
 try:
     import ConfigParser as configparser
@@ -33,6 +33,18 @@ try:
 except ImportError:
     from ipaddress import ip_address
 
+try:
+    import GeoIP as geoip1
+    geoip1_available = True
+except ImportError:
+    geoip1_available = False
+
+try:
+    from geoip2 import database
+    from geoip2.errors import AddressNotFoundError
+    geoip2_available = True
+except ImportError:
+    geoip2_available = False
 
 import argparse
 import os
@@ -119,10 +131,10 @@ class ConfigLoader(object):
                 self.parse_vpn_section(config, section)
 
     def load_default_settings(self):
-        info('Using default settings => 10.8.0.1:5555')
+        info('Using default settings => localhost:5555')
         self.settings = {'site': 'Default Site',
                          'maps': 'True',
-                         'ip2location_db': '/usr/share/IP2LOCATION-LITE-DB11.BIN',
+                         'geoip_data': './data/IP2LOCATION-LITE-DB11.BIN',
                          'datetime_format': '%d/%m/%Y %H:%M:%S'}
         self.vpns['Default VPN'] = {'name': 'default',
                                     'host': 'localhost',
@@ -131,7 +143,7 @@ class ConfigLoader(object):
                                     'show_disconnect': False}
 
     def parse_global_section(self, config):
-        global_vars = ['site', 'logo', 'latitude', 'longitude', 'maps', 'maps_height', 'ip2location_db', 'datetime_format']
+        global_vars = ['site', 'logo', 'latitude', 'longitude', 'maps', 'maps_height', 'geoip_data', 'datetime_format']
         for var in global_vars:
             try:
                 self.settings[var] = config.get('openvpn-monitor', var)
@@ -326,7 +338,9 @@ class OpenvpnMgmtInterface(object):
         return stats
 
     def parse_status(self, data, version):
-        #gi = self.gi
+#        gi = self.gi
+#        geoip_version = self.geoip_version
+        
         client_section = False
         routes_section = False
         sessions = {}
@@ -398,8 +412,8 @@ class OpenvpnMgmtInterface(object):
                     session['location'] = 'loopback'
                 else:
                     try:
-                        databasemine = IP2Location.IP2Location(self.settings['geoip_data'])
-
+                        databasemine = IP2Location.IP2Location(os.path.join("data", "IP2LOCATION-LITE-DB11.BIN"))
+                        #databasemine = IP2Location.IP2Location(self.setting["geoip_data"])
                         rec = databasemine.get_all(str(session['remote_ip']))
                         session['location'] = rec.country_short
                         session['region']   = rec.region
@@ -409,7 +423,7 @@ class OpenvpnMgmtInterface(object):
                         session['latitude'] = rec.latitude
                         session['isp']      = rec.isp
 
-                    except AddressNotFoundError:
+                    except ValueError:
                         pass
                     except SystemError:
                         pass
@@ -693,7 +707,7 @@ class OpenvpnHtmlPrinter(object):
         output('<td>{0!s}</td>'.format(up_since.strftime(self.datetime_format)))
         output('<td>{0!s}</td>'.format(local_ip))
         if vpn_mode == 'Client':
-            output('<td>{0!s}</td>'.format(remote_ip))
+            output('<td>{0!s} / {1!s}</td>'.format(remote_ip , session['isp']))
         output('</tr></tbody></table></div>')
 
         if vpn_mode == 'Client' or nclients > 0:

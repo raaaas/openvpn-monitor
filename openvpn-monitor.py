@@ -21,6 +21,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os, IP2Location, sys
+
 try:
     import ConfigParser as configparser
 except ImportError:
@@ -31,18 +33,6 @@ try:
 except ImportError:
     from ipaddress import ip_address
 
-try:
-    import GeoIP as geoip1
-    geoip1_available = True
-except ImportError:
-    geoip1_available = False
-
-try:
-    from geoip2 import database
-    from geoip2.errors import AddressNotFoundError
-    geoip2_available = True
-except ImportError:
-    geoip2_available = False
 
 import argparse
 import os
@@ -201,20 +191,6 @@ class OpenvpnMgmtInterface(object):
                         self.send_command(command)
                     self._socket_disconnect()
 
-        geoip_data = cfg.settings['geoip_data']
-        self.geoip_version = None
-        self.gi = None
-        try:
-            if geoip_data.endswith('.mmdb') and geoip2_available:
-                self.gi = database.Reader(geoip_data)
-                self.geoip_version = 2
-            elif geoip_data.endswith('.dat') and geoip1_available:
-                self.gi = geoip1.open(geoip_data, geoip1.GEOIP_STANDARD)
-                self.geoip_version = 1
-            else:
-                warning('No compatible geoip1 or geoip2 data/libraries found.')
-        except IOError:
-            warning('No compatible geoip1 or geoip2 data/libraries found.')
 
         for _, vpn in list(self.vpns.items()):
             self._socket_connect(vpn)
@@ -423,23 +399,17 @@ class OpenvpnMgmtInterface(object):
                     session['location'] = 'loopback'
                 else:
                     try:
-                        if geoip_version == 1:
-                            gir = gi.record_by_addr(str(session['remote_ip']))
-                            if gir is not None:
-                                session['location'] = gir['country_code']
-                                session['region'] = get_str(gir['region'])
-                                session['city'] = get_str(gir['city'])
-                                session['country'] = gir['country_name']
-                                session['longitude'] = gir['longitude']
-                                session['latitude'] = gir['latitude']
-                        elif geoip_version == 2:
-                            gir = gi.city(str(session['remote_ip']))
-                            session['location'] = gir.country.iso_code
-                            session['region'] = gir.subdivisions.most_specific.iso_code
-                            session['city'] = gir.city.name
-                            session['country'] = gir.country.name
-                            session['longitude'] = gir.location.longitude
-                            session['latitude'] = gir.location.latitude
+                        databasemine = IP2Location.IP2Location(os.path.join("data", "IP2LOCATION-LITE-DB11.BIN"))
+
+                        rec = databasemine.get_all(str(session['remote_ip']))
+                        session['location'] = rec.country_short
+                        session['region']   = rec.region
+                        session['city']     = rec.city
+                        session['country']  = rec.country_long
+                        session['longitude']= rec.longitude
+                        session['latitude'] = rec.latitude
+                        session['isp']      = rec.isp
+
                     except AddressNotFoundError:
                         pass
                     except SystemError:

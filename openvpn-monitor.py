@@ -122,7 +122,7 @@ class ConfigLoader(object):
         info('Using default settings => localhost:5555')
         self.settings = {'site': 'Default Site',
                          'maps': 'True',
-                         'geoip_data': '/usr/share/GeoIP/GeoIPCity.dat',
+                         'ip2location_db': '/usr/share/IP2LOCATION-LITE-DB11.BIN',
                          'datetime_format': '%d/%m/%Y %H:%M:%S'}
         self.vpns['Default VPN'] = {'name': 'default',
                                     'host': 'localhost',
@@ -131,7 +131,7 @@ class ConfigLoader(object):
                                     'show_disconnect': False}
 
     def parse_global_section(self, config):
-        global_vars = ['site', 'logo', 'latitude', 'longitude', 'maps', 'maps_height', 'geoip_data', 'datetime_format']
+        global_vars = ['site', 'logo', 'latitude', 'longitude', 'maps', 'maps_height', 'ip2location_db', 'datetime_format']
         for var in global_vars:
             try:
                 self.settings[var] = config.get('openvpn-monitor', var)
@@ -326,8 +326,7 @@ class OpenvpnMgmtInterface(object):
         return stats
 
     def parse_status(self, data, version):
-        gi = self.gi
-        geoip_version = self.geoip_version
+        #gi = self.gi
         client_section = False
         routes_section = False
         sessions = {}
@@ -399,7 +398,7 @@ class OpenvpnMgmtInterface(object):
                     session['location'] = 'loopback'
                 else:
                     try:
-                        databasemine = IP2Location.IP2Location(os.path.join("data", "IP2LOCATION-LITE-DB11.BIN"))
+                        databasemine = IP2Location.IP2Location(self.settings['geoip_data'])
 
                         rec = databasemine.get_all(str(session['remote_ip']))
                         session['location'] = rec.country_short
